@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>PULSE — Floating Trigger &amp; Drawer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050608;
+    --panel: rgba(13,15,19,.86);
+    --panel-solid:#0c0e12;
+    --amber:#e7a83f;
+    --amber-soft: rgba(231,168,63,.16);
+    --amber-line: rgba(231,168,63,.42);
+    --ember:#e0453c;
+    --ember-glow: rgba(224,69,60,.55);
+    --teal:#3fd8c4;
+    --violet:#9078e8;
+    --ink:#ece8e0;
+    --ink-dim:#9aa1a8;
+    --ink-faint: #6c7278;
+    --font-head:'Chakra Petch', sans-serif;
+    --font-body:'Rajdhani', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; overflow-x:hidden; background:#020203; color:var(--ink); font-family:var(--font-body); }
+  button{ font-family:inherit; cursor:pointer; background:none; border:none; color:inherit; }
+
+  /* ---------------- fake game screen backdrop ---------------- */
+  .app-bg{ position:fixed; inset:0; z-index:0; }
+  .app-bg svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .app-bg .shade{ position:absolute; inset:0;
+    background: radial-gradient(65% 70% at 50% 38%, rgba(0,0,0,0) 0%, rgba(2,3,4,.6) 100%),
+                linear-gradient(180deg, rgba(2,3,5,.4) 0%, rgba(2,3,5,.08) 20%, rgba(2,3,5,.5) 100%);
+  }
+  .game-caption{
+    position:absolute; top:22px; left:22px; z-index:2;
+    font-family:var(--font-head); letter-spacing:.14em; font-weight:600;
+    font-size:13px; color:rgba(255,255,255,.55); text-transform:uppercase;
+  }
+  .game-caption span{ display:block; font-family:var(--font-mono); font-weight:400; letter-spacing:.04em; font-size:11px; color:rgba(255,255,255,.32); margin-top:4px; text-transform:none; }
+
+  /* ---------------- scrim ---------------- */
+  .scrim{
+    position:fixed; inset:0; z-index:40; background:rgba(2,3,5,.55); backdrop-filter: blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .3s ease;
+  }
+
+  /* ---------------- floating trigger tab ---------------- */
+  .trigger-tab{
+    position:absolute; top:50%; left:-34px; transform:translateY(-50%);
+    width:34px; height:112px; border-radius:14px 0 0 14px;
+    background: rgba(15,16,20,.62);
+    backdrop-filter: blur(8px);
+    border:1px solid rgba(231,168,63,.35); border-right:none;
+    box-shadow: -8px 0 24px -8px rgba(0,0,0,.6), inset 1px 0 0 rgba(255,255,255,.04);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    touch-action:none; z-index:5;
+  }
+  .trigger-tab::before{
+    content:""; position:absolute; left:-1px; top:8%; bottom:8%; width:2px;
+    background: linear-gradient(180deg, transparent, var(--amber), transparent);
+    box-shadow:0 0 10px 1px rgba(231,168,63,.7);
+    animation: pulseLine 2.6s ease-in-out infinite;
+  }
+  @keyframes pulseLine{ 0%,100%{ opacity:.5;} 50%{ opacity:1;} }
+  .trigger-tab .chev{ width:12px; height:12px; color:var(--amber); transition:transform .3s ease; }
+  .trigger-tab .tlabel{
+    writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg);
+    font-family:var(--font-head); font-weight:600; letter-spacing:.22em; font-size:10px; color:var(--ink-dim);
+  }
+  .drawer.open .trigger-tab .chev{ transform:rotate(180deg); }
+
+  /* ---------------- drawer ---------------- */
+  .drawer{
+    position:fixed; top:0; right:0; height:100dvh; width:min(88vw,368px);
+    background: linear-gradient(180deg, rgba(12,13,16,.94) 0%, rgba(8,9,11,.97) 100%);
+    backdrop-filter: blur(14px);
+    border-left:1px solid rgba(231,168,63,.22);
+    box-shadow: -30px 0 70px -20px rgba(0,0,0,.75);
+    transform: translateX(100%);
+    transition: transform .38s cubic-bezier(.19,.83,.24,1);
+    z-index:50; display:flex; flex-direction:column;
+  }
+  .drawer.open{ transform:translateX(0); }
+  .drawer.dragging{ transition:none; }
+  .drawer .edge-glow{
+    position:absolute; left:-1px; top:0; bottom:0; width:2px;
+    background: linear-gradient(180deg, transparent, var(--amber) 20%, var(--amber) 80%, transparent);
+    box-shadow:0 0 16px 1px rgba(231,168,63,.5);
+  }
+
+  .drawer-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 20px 14px 22px; border-bottom:1px solid rgba(255,255,255,.07); flex:none;
+  }
+  .brand-mini{ display:flex; flex-direction:column; gap:2px; }
+  .brand-mini .bm-title{ font-family:var(--font-head); font-weight:700; letter-spacing:.14em; font-size:19px; color:var(--ink); }
+  .brand-mini .bm-clock{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em; color:var(--ink-faint); }
+  .drawer-close{
+    width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.04); display:flex; align-items:center; justify-content:center; color:var(--ink-dim);
+  }
+  .drawer-close:hover{ color:var(--ink); border-color:rgba(255,255,255,.3); }
+  .drawer-close svg{ width:14px; height:14px; }
+
+  .drawer-scroll{ flex:1; overflow-y:auto; padding:18px 20px 30px; -webkit-overflow-scrolling:touch; }
+  .drawer-scroll::-webkit-scrollbar{ width:5px; }
+  .drawer-scroll::-webkit-scrollbar-thumb{ background:rgba(231,168,63,.3); border-radius:99px; }
+
+  .d-section{ margin-bottom:22px; }
+  .d-section:last-child{ margin-bottom:4px; }
+  .d-label{
+    font-family:var(--font-head); font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+    font-size:11px; color:var(--ink-dim); margin-bottom:10px; display:flex; align-items:center; gap:8px;
+  }
+  .d-label::after{ content:""; flex:1; height:1px; background:linear-gradient(90deg, rgba(231,168,63,.35), transparent); }
+
+  /* quick toggles */
+  .qtoggle-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .qtoggle{
+    aspect-ratio:1; border-radius:10px; border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.03);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--ink-dim);
+    transition:all .15s ease;
+  }
+  .qtoggle svg{ width:20px; height:20px; }
+  .qtoggle .qlabel{ font-size:9px; font-weight:600; text-align:center; line-height:1.15; }
+  .qtoggle.active{ color:#fff8ec; border-color:rgba(231,168,63,.7);
+    background:linear-gradient(160deg, rgba(231,168,63,.28), rgba(231,168,63,.06));
+    box-shadow:0 6px 16px -6px rgba(231,168,63,.4); }
+
+  /* feature grid */
+  .feature-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .feature-card{
+    position:relative; aspect-ratio:1; border-radius:10px; border:1px solid rgba(224,69,60,.28);
+    background: linear-gradient(160deg, rgba(58,20,18,.32), rgba(20,10,10,.38));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    color:#f0b8ae; text-align:center; padding:6px; transition:all .15s ease;
+  }
+  .feature-card svg{ width:19px; height:19px; }
+  .feature-card .flabel{ font-size:8.5px; font-weight:600; line-height:1.15; }
+  .feature-card.active{
+    background: linear-gradient(160deg, #a83029, #6e1a16); border-color:rgba(255,150,130,.6); color:#fff2ee;
+    box-shadow: 0 6px 18px -4px var(--ember-glow);
+  }
+
+  /* stat block */
+  .stat-row{ display:flex; align-items:center; gap:14px; }
+  .radial-wrap{ position:relative; width:76px; height:76px; flex:none; }
+  .radial-wrap svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .radial-wrap .rlabel{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:var(--font-mono); }
+  .radial-wrap .val{ font-size:12px; color:var(--amber); font-weight:700; }
+  .radial-wrap .val.gpu{ color:var(--ember); }
+  .radial-wrap .unit{ font-size:7px; color:var(--ink-faint); letter-spacing:.08em; }
+  .stat-side{ flex:1; display:flex; flex-direction:column; gap:10px; }
+  .mode-pill{
+    font-family:var(--font-head); font-weight:600; letter-spacing:.06em; font-size:11px;
+    padding:7px 14px; border-radius:999px; border:1px solid rgba(63,216,196,.45); color:var(--teal);
+    background:rgba(63,216,196,.08); align-self:flex-start; transition:all .18s ease;
+  }
+  .mode-pill.active{ background:var(--teal); color:#052925; box-shadow:0 6px 16px -6px rgba(63,216,196,.7); }
+
+  .brightness-row{ display:flex; align-items:center; gap:10px; }
+  .brightness-row svg{ width:15px; height:15px; color:var(--ink-faint); flex:none; }
+  .bslider{
+    -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:99px;
+    background: linear-gradient(90deg, var(--amber) 0%, var(--amber) var(--pct,60%), rgba(255,255,255,.12) var(--pct,60%));
+    outline:none;
+  }
+  .bslider::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:#fff4dd; border:2px solid var(--amber); box-shadow:0 0 8px rgba(231,168,63,.7); cursor:pointer;
+  }
+
+  /* crosshair */
+  .crosshair-thumbs{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .ch-thumb{
+    aspect-ratio:1; border-radius:8px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.03);
+    display:flex; align-items:center; justify-content:center; transition:all .15s ease;
+  }
+  .ch-thumb svg{ width:44%; height:44%; }
+  .ch-thumb.selected{ border-color:var(--amber); background:rgba(231,168,63,.12); box-shadow:0 0 0 1px var(--amber-line); }
+
+  /* eagle eye */
+  .eagle-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .eagle-row .switch{ width:38px; height:21px; border-radius:99px; background:rgba(255,255,255,.12); position:relative; border:1px solid rgba(255,255,255,.14); }
+  .eagle-row .switch.on{ background:rgba(231,168,63,.9); border-color:var(--amber); }
+  .eagle-row .switch::after{ content:""; position:absolute; width:15px; height:15px; border-radius:50%; background:#eee; top:2px; left:2px; transition:.15s; }
+  .eagle-row .switch.on::after{ left:19px; background:#fff; }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{
+    font-weight:600; font-size:11.5px; padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.14);
+    color:var(--ink-dim); background:rgba(255,255,255,.03); transition:all .15s ease;
+  }
+  .chip.on{ background:var(--amber); border-color:var(--amber); color:#100b02; }
+
+  .hint{ font-size:11.5px; color:var(--ink-faint); line-height:1.4; margin:10px 0 0; }
+
+  /* ---------------- modal (feature detail) ---------------- */
+  .modal-backdrop{
+    position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
+    background:rgba(2,3,5,.66); backdrop-filter: blur(3px); padding:20px;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal-card{
+    width:min(92%, 420px); max-height:82%; overflow:auto;
+    background:linear-gradient(165deg, rgba(20,17,17,.97), rgba(11,10,10,.97));
+    border:1px solid rgba(231,168,63,.28); border-radius:16px; padding:24px 24px;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.8);
+  }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .modal-head h3{ font-family:var(--font-head); font-weight:600; font-size:18px; margin:0; color:var(--ink); }
+  .modal-close{ width:28px; height:28px; border-radius:50%; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); color:var(--ink-dim); display:flex; align-items:center; justify-content:center; }
+  .modal-body{ color:var(--ink-dim); font-size:14px; line-height:1.5; }
+  .row-toggle{ display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+  .row-toggle:last-child{ border-bottom:none; }
+  .row-toggle .rt-label{ color:var(--ink); font-weight:600; }
+  .switch{ width:40px; height:22px; border-radius:99px; background:rgba(255,255,255,.12); position:relative; border:1px solid rgba(255,255,255,.14); flex:none; }
+  .switch.on{ background:rgba(231,168,63,.9); border-color:var(--amber); }
+  .switch::after{ content:""; position:absolute; width:16px; height:16px; border-radius:50%; background:#eee; top:2px; left:2px; transition:.15s; }
+  .switch.on::after{ left:20px; background:#fff; }
+  .tip-preview{ margin-top:14px; background:rgba(231,168,63,.08); border:1px solid var(--amber-line); border-radius:10px; padding:12px 14px; font-size:13px; color:var(--ink); }
+  .tip-preview b{ color:var(--amber); }
+  .stat-line{ display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:13px; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,.08); }
+  .stat-line span:last-child{ color:var(--amber); }
+</style>
+</head>
+<body>
+
+<div class="app-bg">
+  <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#1f271e"/>
+        <stop offset="55%" stop-color="#151b16"/>
+        <stop offset="100%" stop-color="#0c0e0c"/>
+      </linearGradient>
+    </defs>
+    <rect width="1000" height="1000" fill="url(#ground)"/>
+    <ellipse cx="220" cy="200" rx="200" ry="140" fill="#2c3a26" opacity=".55"/>
+    <ellipse cx="780" cy="760" rx="240" ry="180" fill="#26331f" opacity=".55"/>
+    <ellipse cx="760" cy="180" rx="160" ry="120" fill="#293725" opacity=".45"/>
+    <g stroke="#4a5058" stroke-width="16" opacity=".4" fill="none">
+      <path d="M-60,650 L460,320 L640,380 L1040,120"/>
+      <path d="M120,-40 L460,420 L420,1040"/>
+    </g>
+    <rect x="420" y="380" width="70" height="50" rx="4" fill="#343434" opacity=".8"/>
+    <rect x="560" y="560" width="90" height="60" rx="4" fill="#343434" opacity=".8"/>
+    <circle cx="600" cy="420" r="7" fill="#e0453c"/>
+    <circle cx="380" cy="600" r="7" fill="#e0453c"/>
+    <g transform="translate(500,540)">
+      <circle r="30" fill="none" stroke="#3fd8c4" stroke-width="1.4" opacity=".5"/>
+      <polygon points="0,-16 11,12 0,6 -11,12" fill="#3fd8c4"/>
+    </g>
+  </svg>
+  <div class="shade"></div>
+  <div class="game-caption">Live match feed<span>tap the edge tab, or swipe left, to open PULSE</span></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="drawer" id="drawer" role="dialog" aria-label="PULSE control drawer">
+  <div class="edge-glow"></div>
+
+  <button class="trigger-tab" id="triggerTab" aria-expanded="false" aria-controls="drawer" title="Open PULSE">
+    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
+    <span class="tlabel">PULSE</span>
+  </button>
+
+  <div class="drawer-head">
+    <div class="brand-mini">
+      <div class="bm-title">PULSE</div>
+      <div class="bm-clock" id="clock">00:00:00</div>
+    </div>
+    <button class="drawer-close" id="drawerClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </div>
+
+  <div class="drawer-scroll">
+
+    <div class="d-section">
+      <div class="d-label">Quick toggles</div>
+      <div class="qtoggle-grid" id="toggleGrid"></div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-label">Features</div>
+      <div class="feature-grid" id="featureGrid"></div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-label">CPU / GPU live stat</div>
+      <div class="stat-row">
+        <div class="radial-wrap">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
+            <circle id="cpuArc" cx="50" cy="50" r="42" fill="none" stroke="#e7a83f" stroke-width="8" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="140"/>
+            <circle id="gpuArc" cx="50" cy="50" r="32" fill="none" stroke="#e0453c" stroke-width="6" stroke-linecap="round" stroke-dasharray="201" stroke-dashoffset="110"/>
+          </svg>
+          <div class="rlabel">
+            <div class="val" id="cpuVal">47%</div><div class="unit">CPU</div>
+            <div class="val gpu" id="gpuVal">53%</div><div class="unit">GPU</div>
+          </div>
+        </div>
+        <div class="stat-side">
+          <button class="mode-pill" id="modePill">Game-mode</button>
+          <div class="brightness-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg>
+            <input type="range" class="bslider" id="brightSlider" min="40" max="130" value="100" style="--pct:60%;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-label">Crosshair</div>
+      <div class="crosshair-thumbs" id="crosshairThumbs"></div>
+    </div>
+
+    <div class="d-section">
+      <div class="eagle-row">
+        <div class="d-label" style="margin:0;">Eagle Eye</div>
+        <div class="switch on" id="eagleMaster"></div>
+      </div>
+      <div class="chip-row" id="eagleChips"></div>
+      <p class="hint">All toggles reflect stateful active styling.</p>
+    </div>
+
+  </div>
+</aside>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal-card" id="modalCard"></div>
+</div>
+
+<script>
+(function(){
+  /* ---------------- icons ---------------- */
+  const I = {
+    aiCoach: '<path d="M4 5h16v10H9l-4 4V5z"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/>',
+    winRate: '<path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15l4.5-5"/><circle cx="12" cy="15" r="1" fill="currentColor" stroke="none"/>',
+    voiceSwap: '<rect x="9" y="3" width="6" height="10" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4"/><path d="M9 21h6"/>',
+    touchSampling: '<path d="M12 3a8 8 0 0 1 8 8c0 4-2 6-2 6"/><path d="M12 6a5 5 0 0 1 5 5c0 3-1.5 4.5-1.5 4.5"/><path d="M12 9a2 2 0 0 1 2 2c0 3-3 6-3 9"/><path d="M8 10c-.6 1-1 2.3-1 4 0 3 2 5 2 5"/>',
+    frameRate: '<rect x="3" y="6" width="14" height="12" rx="2"/><path d="M17 10l4-3v10l-4-3"/>',
+    dnd: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    blockCalls: '<path d="M5 4l14 16"/><path d="M6.6 10.8a13 13 0 0 0 6.6 6.6l2.2-2.2c.5-.5 1.3-.6 1.9-.3 1 .4 2 .7 3.1.8.8.1 1.4.8 1.4 1.6V21c0 .8-.7 1.5-1.5 1.4C10.7 21.7 2.3 13.3 1.6 3.5 1.5 2.7 2.2 2 3 2h3.7c.8 0 1.5.6 1.6 1.4.1 1.1.4 2.1.8 3.1.3.6.2 1.4-.3 1.9L6.6 10.8z"/>',
+    scoutMode: '<circle cx="8" cy="13" r="4"/><circle cx="16" cy="13" r="4"/><path d="M11 12h2"/><path d="M8 9V6l2-2"/><path d="M16 9V6l-2-2"/>',
+    huntMode: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+    crosshair: '<circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+    eagleEye: '<path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>',
+    wifi: '<path d="M3 8.5a15 15 0 0 1 18 0"/><path d="M6.2 12.2a10.5 10.5 0 0 1 11.6 0"/><path d="M9.4 15.8a6 6 0 0 1 5.2 0"/><circle cx="12" cy="18.5" r="1" fill="currentColor" stroke="none"/>',
+    refreshHz: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>',
+    fan: '<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 12c0-4 2-7 5-7s3 3 0 5-5 2-5 2z"/><path d="M12 12c-4 0-7-2-7-5s3-3 5 0 2 5 2 5z"/><path d="M12 12c0 4-2 7-5 7s-3-3 0-5 5-2 5-2z"/>',
+    screenRec: '<rect x="3" y="6" width="13" height="11" rx="2"/><circle cx="9.5" cy="11.5" r="2.4" fill="currentColor" stroke="none"/><path d="M18 10l3-2v9l-3-2"/>',
+    optimize: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/>',
+    touchAcc: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none"/>',
+    circ: '<circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  };
+  function svg(name){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+I[name]+'</svg>'; }
+
+  const FEATURES = [
+    {id:'aiCoach', label:'AI Coach', icon:'aiCoach'},
+    {id:'winRate', label:'Win Rate', icon:'winRate'},
+    {id:'voiceSwap', label:'Voice Swap', icon:'voiceSwap'},
+    {id:'touchSampling', label:'Touch Sampling', icon:'touchSampling'},
+    {id:'frameRate', label:'Frame Rate', icon:'frameRate'},
+    {id:'dnd', label:'DND Mode', icon:'dnd'},
+    {id:'blockCalls', label:'Block Calls', icon:'blockCalls'},
+    {id:'scoutMode', label:'Scout Mode', icon:'scoutMode'},
+    {id:'huntMode', label:'Hunt Mode', icon:'huntMode'},
+    {id:'crosshair', label:'Crosshair', icon:'crosshair'},
+    {id:'eagleEye', label:'Eagle Eye', icon:'eagleEye'},
+  ];
+  const TOGGLES = [
+    {id:'wifi', label:'WiFi', icon:'wifi'},
+    {id:'refreshRate', label:'Refresh Hz', icon:'refreshHz'},
+    {id:'fanCooling', label:'Fan/Cool', icon:'fan'},
+    {id:'screenRecording', label:'Recording', icon:'screenRec'},
+    {id:'optimize', label:'Optimize', icon:'optimize'},
+    {id:'touchAccuracy', label:'Touch Acc.', icon:'touchAcc'},
+  ];
+  const CROSSHAIRS = ['dot','plusThin','plusGap','circlePlus','plusBold','dotSmall','circleThin', null];
+  function crosshairSvg(kind){
+    switch(kind){
+      case 'dot': return svg('circ');
+      case 'plusThin': return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 4v6M12 14v6M4 12h6M14 12h6"/></svg>';
+      case 'plusGap': return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/></svg>';
+      case 'circlePlus': return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="6"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/></svg>';
+      case 'plusBold': return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v5M12 14v5M5 12h5M14 12h5"/></svg>';
+      case 'dotSmall': return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v1M12 14v1M9 12h1M14 12h1"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>';
+      case 'circleThin': return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>';
+      default: return '';
+    }
+  }
+  const EAGLE_CHIPS = ['Map','Buildings','Enemies','Grass'];
+
+  const state = {
+    features: { aiCoach:true, winRate:false, voiceSwap:true, touchSampling:false, frameRate:false,
+                dnd:false, blockCalls:false, scoutMode:false, huntMode:true, crosshair:true, eagleEye:true },
+    toggles: { wifi:true, refreshRate:true, fanCooling:false, screenRecording:false, optimize:false, touchAccuracy:false },
+    aiCoach: { on:true, voiceTip:false },
+    modePill: true,
+    crosshairSel: 1,
+    eagleMaster: true,
+    eagleChips: { Map:true, Buildings:false, Enemies:false, Grass:false },
+  };
+
+  /* ---------------- render ---------------- */
+  const toggleGrid = document.getElementById('toggleGrid');
+  function renderToggles(){
+    toggleGrid.innerHTML = TOGGLES.map(t => (
+      '<button class="qtoggle '+(state.toggles[t.id]?'active':'')+'" data-id="'+t.id+'">'+svg(t.icon)+'<span class="qlabel">'+t.label+'</span></button>'
+    )).join('');
+  }
+  toggleGrid.addEventListener('click', e => {
+    const b = e.target.closest('.qtoggle'); if(!b) return;
+    state.toggles[b.dataset.id] = !state.toggles[b.dataset.id]; renderToggles();
+  });
+
+  const featureGrid = document.getElementById('featureGrid');
+  function renderFeatures(){
+    featureGrid.innerHTML = FEATURES.map(f => (
+      '<button class="feature-card '+(state.features[f.id]?'active':'')+'" data-id="'+f.id+'">'+svg(f.icon)+'<span class="flabel">'+f.label+'</span></button>'
+    )).join('');
+  }
+  featureGrid.addEventListener('click', e => {
+    const b = e.target.closest('.feature-card'); if(!b) return;
+    const id = b.dataset.id;
+    state.features[id] = !state.features[id];
+    renderFeatures();
+    openFeatureModal(id);
+  });
+
+  const crosshairThumbs = document.getElementById('crosshairThumbs');
+  function renderCrosshairs(){
+    crosshairThumbs.innerHTML = CROSSHAIRS.map((c,i) => c===null
+      ? '<div class="ch-thumb" style="opacity:0;pointer-events:none;"></div>'
+      : '<button class="ch-thumb '+(state.crosshairSel===i?'selected':'')+'" data-i="'+i+'">'+crosshairSvg(c)+'</button>'
+    ).join('');
+  }
+  crosshairThumbs.addEventListener('click', e => {
+    const b = e.target.closest('.ch-thumb'); if(!b) return;
+    state.crosshairSel = +b.dataset.i; renderCrosshairs();
+  });
+
+  const eagleChips = document.getElementById('eagleChips');
+  function renderEagleChips(){
+    eagleChips.innerHTML = EAGLE_CHIPS.map(n => (
+      '<button class="chip '+(state.eagleChips[n]?'on':'')+'" data-name="'+n+'">'+n+'</button>'
+    )).join('');
+  }
+  eagleChips.addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if(!b) return;
+    const n = b.dataset.name; state.eagleChips[n] = !state.eagleChips[n]; renderEagleChips();
+  });
+  const eagleMaster = document.getElementById('eagleMaster');
+  eagleMaster.addEventListener('click', () => {
+    state.eagleMaster = !state.eagleMaster;
+    eagleMaster.classList.toggle('on', state.eagleMaster);
+  });
+
+  const modePill = document.getElementById('modePill');
+  modePill.addEventListener('click', () => { state.modePill = !state.modePill; modePill.classList.toggle('active', state.modePill); });
+
+  const brightSlider = document.getElementById('brightSlider');
+  brightSlider.addEventListener('input', () => {
+    const pct = (brightSlider.value - brightSlider.min) / (brightSlider.max - brightSlider.min) * 100;
+    brightSlider.style.setProperty('--pct', pct+'%');
+    document.querySelector('.app-bg').style.filter = 'brightness(' + (brightSlider.value/100) + ')';
+  });
+
+  /* ---------------- telemetry + clock ---------------- */
+  const CIRC_CPU = 2*Math.PI*42, CIRC_GPU = 2*Math.PI*32;
+  function randomizeTelemetry(){
+    const cpu = 28 + Math.round(Math.random()*55);
+    const gpu = 24 + Math.round(Math.random()*62);
+    document.getElementById('cpuVal').textContent = cpu+'%';
+    document.getElementById('gpuVal').textContent = gpu+'%';
+    const cpuArc = document.getElementById('cpuArc'), gpuArc = document.getElementById('gpuArc');
+    cpuArc.style.transition = 'stroke-dashoffset .8s ease';
+    gpuArc.style.transition = 'stroke-dashoffset .8s ease';
+    cpuArc.setAttribute('stroke-dashoffset', CIRC_CPU*(1-cpu/100));
+    gpuArc.setAttribute('stroke-dashoffset', CIRC_GPU*(1-gpu/100));
+  }
+  function tickClock(){
+    const d = new Date(); const pad = n => String(n).padStart(2,'0');
+    document.getElementById('clock').textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  }
+
+  /* ---------------- feature modal ---------------- */
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalCard = document.getElementById('modalCard');
+  function closeModal(){ modalBackdrop.classList.remove('open'); modalCard.innerHTML=''; }
+  modalBackdrop.addEventListener('click', e => { if(e.target===modalBackdrop) closeModal(); });
+  function modalShell(title, body){
+    return '<div class="modal-head"><h3>'+title+'</h3><button class="modal-close" id="mClose">&#10005;</button></div><div class="modal-body">'+body+'</div>';
+  }
+  function openFeatureModal(id){
+    if(!state.features[id]) return;
+    const title = FEATURES.find(f=>f.id===id).label;
+    let body;
+    if(id==='aiCoach'){
+      body = '<div class="row-toggle"><span class="rt-label">Live tip bubble</span><div class="switch '+(state.aiCoach.on?'on':'')+'" data-k="on"></div></div>'+
+             '<div class="row-toggle"><span class="rt-label">Voice tip</span><div class="switch '+(state.aiCoach.voiceTip?'on':'')+'" data-k="voiceTip"></div></div>'+
+             '<div class="tip-preview"><b>Coach:</b> Ward the river bush before the 8-minute mark — vision wins this fight.</div>';
+    } else if(id==='crosshair'){
+      body = '<p>Pick an overlay style from the Crosshair section — it applies to the live view instantly.</p>';
+    } else if(id==='eagleEye'){
+      body = '<p>Eagle Eye highlights the categories enabled below.</p>' +
+             EAGLE_CHIPS.map(n=>'<div class="stat-line"><span>'+n+'</span><span>'+(state.eagleChips[n]?'ON':'off')+'</span></div>').join('');
+    } else if(id==='winRate'){
+      body = '<div class="stat-line"><span>Last 10 games</span><span>62%</span></div><div class="stat-line"><span>This week</span><span>54%</span></div><div class="stat-line"><span>Season</span><span>58%</span></div>';
+    } else {
+      body = '<p>'+title+' is now '+(state.features[id]?'<b style="color:var(--amber)">enabled</b>':'disabled')+'.</p>';
+    }
+    modalCard.innerHTML = modalShell(title, body);
+    modalBackdrop.classList.add('open');
+    document.getElementById('mClose').addEventListener('click', closeModal);
+    modalCard.querySelectorAll('.switch').forEach(sw => sw.addEventListener('click', () => {
+      const k = sw.dataset.k; state.aiCoach[k] = !state.aiCoach[k]; sw.classList.toggle('on', state.aiCoach[k]);
+    }));
+  }
+
+  /* ---------------- drawer open/close + drag/swipe ---------------- */
+  const drawer = document.getElementById('drawer');
+  const tab = document.getElementById('triggerTab');
+  const scrim = document.getElementById('scrim');
+  const drawerClose = document.getElementById('drawerClose');
+
+  function setOpen(open){
+    drawer.classList.toggle('open', open);
+    drawer.style.transform = '';
+    scrim.style.opacity = open ? '1' : '0';
+    scrim.style.pointerEvents = open ? 'auto' : 'none';
+    tab.setAttribute('aria-expanded', String(open));
+  }
+
+  let drag = null;
+  function onPointerDown(e){
+    tab.setPointerCapture(e.pointerId);
+    const width = drawer.offsetWidth;
+    const isOpen = drawer.classList.contains('open');
+    drag = { id:e.pointerId, startX:e.clientX, startTX: isOpen ? 0 : width, width, moved:false, lastTX: isOpen?0:width };
+    drawer.classList.add('dragging');
+  }
+  function onPointerMove(e){
+    if(!drag || e.pointerId!==drag.id) return;
+    const dx = e.clientX - drag.startX;
+    if(Math.abs(dx) > 3) drag.moved = true;
+    let tx = drag.startTX + dx;
+    tx = Math.max(0, Math.min(drag.width, tx));
+    drawer.style.transform = 'translateX('+tx+'px)';
+    scrim.style.opacity = String(1 - tx/drag.width);
+    scrim.style.pointerEvents = 'auto';
+    drag.lastTX = tx;
+  }
+  function onPointerUp(e){
+    if(!drag || e.pointerId!==drag.id) return;
+    drawer.classList.remove('dragging');
+    if(drag.moved){
+      const shouldOpen = drag.lastTX < drag.width * 0.4;
+      setOpen(shouldOpen);
+    } else {
+      setOpen(!drawer.classList.contains('open'));
+    }
+    drag = null;
+  }
+  tab.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+
+  drawerClose.addEventListener('click', () => setOpen(false));
+  scrim.addEventListener('click', () => setOpen(false));
+  window.addEventListener('keydown', e => { if(e.key==='Escape') setOpen(false); });
+
+  /* ---------------- init ---------------- */
+  renderToggles();
+  renderFeatures();
+  renderCrosshairs();
+  renderEagleChips();
+  tickClock();
+  randomizeTelemetry();
+  setInterval(tickClock, 1000);
+  setInterval(randomizeTelemetry, 2600);
+})();
+</script>
+</body>
+</html>
